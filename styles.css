@@ -162,26 +162,9 @@ body {
   font-size: 0.92rem;
 }
 
-.settings {
-  margin-top: 18px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid #d8cab5;
-  border-radius: 12px;
-  padding: 12px;
-}
-
-.settings h2,
 .archive-title {
   margin: 0 0 10px;
   font-size: 1rem;
-}
-
-.setting-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 8px;
 }
 
 .archive-grid {

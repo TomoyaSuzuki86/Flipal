@@ -1,5 +1,4 @@
-﻿const STORAGE_KEY = "flipal.settings.v1";
-const LAST_OPENED_KEY = "flipal.lastOpenedDate";
+﻿const LAST_OPENED_KEY = "flipal.lastOpenedDate";
 
 const state = {
   entries: [],
@@ -8,10 +7,6 @@ const state = {
   pageDate: isoDate(new Date()),
   view: "home",
   detailDate: null,
-  settings: {
-    sound: false,
-    effectIntensity: "medium",
-  },
 };
 
 const el = {
@@ -26,8 +21,6 @@ const el = {
   homeMessage: document.getElementById("homeMessage"),
   flipButton: document.getElementById("flipButton"),
   flipStatus: document.getElementById("flipStatus"),
-  soundToggle: document.getElementById("soundToggle"),
-  effectIntensity: document.getElementById("effectIntensity"),
   archiveGrid: document.getElementById("archiveGrid"),
   detailDate: document.getElementById("detailDate"),
   detailImage: document.getElementById("detailImage"),
@@ -42,7 +35,6 @@ const el = {
 init();
 
 async function init() {
-  loadSettings();
   wireEvents();
   await loadEntries();
   updateTodayState();
@@ -73,27 +65,6 @@ async function loadEntries() {
   state.map = new Map(state.entries.map((item) => [item.date, item]));
 }
 
-function loadSettings() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw);
-      state.settings.sound = !!parsed.sound;
-      if (["low", "medium", "high"].includes(parsed.effectIntensity)) {
-        state.settings.effectIntensity = parsed.effectIntensity;
-      }
-    } catch (e) {
-      // ignore invalid local storage
-    }
-  }
-  el.soundToggle.checked = state.settings.sound;
-  el.effectIntensity.value = state.settings.effectIntensity;
-}
-
-function saveSettings() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.settings));
-}
-
 function wireEvents() {
   el.tabs.forEach((tab) => {
     tab.addEventListener("click", () => showView(tab.dataset.view));
@@ -104,16 +75,6 @@ function wireEvents() {
   el.flipButton.addEventListener("click", onFlipAction);
   el.pageContainer.addEventListener("touchstart", onSwipeStart, { passive: true });
   el.pageContainer.addEventListener("touchend", onSwipeEnd, { passive: true });
-
-  el.soundToggle.addEventListener("change", (event) => {
-    state.settings.sound = event.target.checked;
-    saveSettings();
-  });
-
-  el.effectIntensity.addEventListener("change", (event) => {
-    state.settings.effectIntensity = event.target.value;
-    saveSettings();
-  });
 
   el.prevDetail.addEventListener("click", () => moveDetail(-1));
   el.nextDetail.addEventListener("click", () => moveDetail(1));
@@ -137,7 +98,7 @@ function renderArchive() {
       const locked = isFuture(entry.date);
       const thumb = entry.image || "";
       return `
-      <article class="archive-item ${locked ? "locked" : ""}" data-date="${entry.date}" ${locked ? "aria-disabled=\"true\"" : ""}>
+      <article class="archive-item ${locked ? "locked" : ""}" data-date="${entry.date}" ${locked ? 'aria-disabled="true"' : ""}>
         <img src="${escapeHtml(thumb)}" alt="${entry.date}" loading="lazy" onerror="this.removeAttribute('src')" />
         <div class="archive-meta">
           <div>${formatJPDate(entry.date)}</div>
@@ -211,8 +172,7 @@ function updateFlipState() {
   if (canFlip) {
     el.flipStatus.textContent = "次のページを開けます。";
   } else {
-    const hhmm = "00:00";
-    el.flipStatus.textContent = `次のページは ${hhmm} 以降に開けます。`;
+    el.flipStatus.textContent = "次のページは 00:00 以降に開けます。";
   }
 }
 
@@ -253,13 +213,7 @@ function playFlipAnimation() {
   el.curlOverlay.classList.remove("play");
   void el.curlOverlay.offsetWidth;
   el.curlOverlay.classList.add("play");
-
-  if (state.settings.effectIntensity !== "low") {
-    spawnConfetti(state.settings.effectIntensity === "high" ? 24 : 12);
-  }
-  if (state.settings.sound) {
-    beep();
-  }
+  spawnConfetti(12);
 }
 
 function spawnConfetti(count) {
@@ -273,19 +227,6 @@ function spawnConfetti(count) {
     document.body.appendChild(node);
     setTimeout(() => node.remove(), 1100);
   }
-}
-
-function beep() {
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = "triangle";
-  osc.frequency.value = 880;
-  gain.gain.value = 0.05;
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start();
-  osc.stop(ctx.currentTime + 0.08);
 }
 
 function setImage(node, src, date) {
