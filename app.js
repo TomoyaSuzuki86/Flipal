@@ -341,6 +341,7 @@ function updateFlipState() {
 
 function onPullStart(event) {
   if (state.view !== "home") return;
+  if (!state.canFlip) return;
   if (event.pointerType === "mouse" && event.button !== 0) return;
 
   pullState.active = true;
