@@ -1,4 +1,5 @@
 ﻿const LAST_OPENED_KEY = "flipal.lastOpenedDate";
+const SESSION_KEY = "flipal.session.v1";
 const PULL_MAX = 150;
 const RIP_THRESHOLD = 95;
 
@@ -9,6 +10,7 @@ const state = {
   testMode: false,
   pageDate: isoDate(new Date()),
   canFlip: false,
+  revealNextDuringFlip: false,
   view: "home",
   detailDate: null,
   archiveViewMode: "grid",
@@ -63,6 +65,7 @@ async function init() {
   setupTestMode();
   wireEvents();
   await loadEntries();
+  loadSessionState();
   updateTodayState();
   renderHome();
   renderArchive();
@@ -76,6 +79,10 @@ async function init() {
     const nextDeviceToday = isoDate(new Date());
     if (nextDeviceToday !== state.deviceToday) {
       state.deviceToday = nextDeviceToday;
+      if (state.pageDate > state.deviceToday) {
+        state.pageDate = state.deviceToday;
+        persistSession();
+      }
       renderHome();
       renderArchive();
       if (state.view === "detail" && state.detailDate) {
@@ -133,7 +140,9 @@ function renderHome() {
 
   const next = nextDate(state.pageDate);
   const nextEntry = state.map.get(next);
-  if (next <= state.deviceToday) {
+  if (state.revealNextDuringFlip && state.canFlip) {
+    setImage(el.nextImage, nextEntry?.image || "", next);
+  } else if (next <= state.pageDate) {
     setImage(el.nextImage, nextEntry?.image || "", next);
   } else {
     setImage(el.nextImage, "", next);
@@ -143,7 +152,8 @@ function renderHome() {
 function renderGrid() {
   const html = state.entries
     .map((entry) => {
-      const locked = isFuture(entry.date);
+      const lockType = getLockType(entry.date);
+      const locked = lockType !== "open";
       const thumb = entry.image || "";
       return `
       <article class="archive-item ${locked ? "locked" : ""}" data-date="${entry.date}" ${locked ? 'aria-disabled="true"' : ""}>
@@ -154,7 +164,11 @@ function renderGrid() {
         }
         <div class="archive-meta">
           <div>${formatJPDate(entry.date)}</div>
-          ${locked ? '<div class="lock-badge">未来日は閲覧できません</div>' : ""}
+          ${
+            locked
+              ? `<div class="lock-badge">${lockType === "future" ? "未来日は閲覧できません" : "まだめくっていない日です"}</div>`
+              : ""
+          }
         </div>
       </article>`;
     })
@@ -163,10 +177,11 @@ function renderGrid() {
 
   Array.from(el.archiveGrid.querySelectorAll(".archive-item")).forEach((node) => {
     const date = node.dataset.date;
-    const locked = isFuture(date);
+    const lockType = getLockType(date);
+    const locked = lockType !== "open";
     node.addEventListener("click", () => {
       if (locked) {
-        alert("未来のページは開けません。");
+        alert(lockType === "future" ? "未来のページは開けません。" : "この日はまだめくっていないため開けません。");
         return;
       }
       showDetail(date);
@@ -203,7 +218,8 @@ function renderCalendar() {
     const date = new Date(currentYear, currentMonth, day);
     const iso = isoDate(date);
     const entry = state.map.get(iso);
-    const locked = isFuture(iso);
+    const lockType = getLockType(iso);
+    const locked = lockType !== "open";
     const isToday = iso === todayIso;
 
     const classes = ["calendar-day"];
@@ -231,11 +247,12 @@ function renderCalendar() {
 
   Array.from(el.archiveCalendar.querySelectorAll(".calendar-day")).forEach((node) => {
     const date = node.dataset.date;
-    const locked = isFuture(date);
+    const lockType = getLockType(date);
+    const locked = lockType !== "open";
     if (!node.classList.contains("empty")) {
       node.addEventListener("click", () => {
         if (locked) {
-          alert("未来のページは開けません。");
+          alert(lockType === "future" ? "未来のページは開けません。" : "この日はまだめくっていないため開けません。");
           return;
         }
         showDetail(date);
@@ -282,7 +299,7 @@ function renderDetail(date) {
   setImage(el.detailImage, entry.image || "", date);
   el.detailMessage.textContent = entry.message || "";
 
-  const unlockedDates = state.entries.map((e) => e.date).filter((d) => !isFuture(d));
+  const unlockedDates = state.entries.map((e) => e.date).filter((d) => getLockType(d) === "open");
   const idx = unlockedDates.indexOf(date);
   const prevDate = idx > 0 ? unlockedDates[idx - 1] : null;
   const nextDateValue = idx >= 0 && idx < unlockedDates.length - 1 ? unlockedDates[idx + 1] : null;
@@ -376,15 +393,28 @@ function resetPullVisual() {
 }
 
 function triggerRipFlip() {
+  state.revealNextDuringFlip = true;
+  renderHome();
   el.pageFlipper.classList.add("ripping");
 
+  requestAnimationFrame(() => {
+    el.pageFlipper.classList.add("dropping");
+  });
+
   setTimeout(() => {
-    // Confetti starts only after the pointer is released and rip animation begins.
     spawnConfetti(24);
+    advancePage();
     el.pageFlipper.classList.remove("ripping");
+    el.pageFlipper.classList.add("settling");
+    el.pageFlipper.classList.remove("dropping");
     resetPullVisual();
-    onFlipAction(true);
-  }, 300);
+    state.revealNextDuringFlip = false;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        el.pageFlipper.classList.remove("settling");
+      });
+    });
+  }, 460);
 }
 
 function setupTestMode() {
@@ -404,6 +434,10 @@ function setupTestMode() {
 
 function shiftTestDate(days) {
   state.deviceToday = addDays(state.deviceToday, days);
+  if (state.pageDate > state.deviceToday) {
+    state.pageDate = state.deviceToday;
+    persistSession();
+  }
   refreshTestDateLabel();
   renderHome();
   renderArchive();
@@ -415,6 +449,10 @@ function shiftTestDate(days) {
 
 function resetTestDateToReal() {
   state.deviceToday = isoDate(new Date());
+  if (state.pageDate > state.deviceToday) {
+    state.pageDate = state.deviceToday;
+    persistSession();
+  }
   refreshTestDateLabel();
   renderHome();
   renderArchive();
@@ -453,10 +491,75 @@ function onFlipAction(skipPageCurl = false) {
 function advancePage() {
   const next = nextDate(state.pageDate);
   state.pageDate = next;
+  persistSession();
   updateTodayState();
   renderHome();
   renderArchive();
   updateFlipState();
+}
+
+function loadSessionState() {
+  let savedProgressDate = null;
+  const raw = localStorage.getItem(SESSION_KEY);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(parsed.progressDate || "")) {
+        savedProgressDate = parsed.progressDate;
+      }
+    } catch (e) {
+      // ignore invalid session data
+    }
+  }
+
+  const fallback = getDefaultProgressDate();
+  state.pageDate = clampProgressDate(savedProgressDate || fallback);
+  persistSession();
+}
+
+function persistSession() {
+  localStorage.setItem(
+    SESSION_KEY,
+    JSON.stringify({
+      progressDate: state.pageDate,
+      lastSeenAt: new Date().toISOString(),
+    })
+  );
+}
+
+function getDefaultProgressDate() {
+  const latestOpenEntry = state.entries
+    .map((entry) => entry.date)
+    .filter((date) => date <= state.deviceToday)
+    .pop();
+  return latestOpenEntry || state.deviceToday;
+}
+
+function clampProgressDate(iso) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || "")) {
+    return state.deviceToday;
+  }
+  if (iso > state.deviceToday) {
+    return state.deviceToday;
+  }
+  if (state.entries.length === 0) {
+    return iso;
+  }
+  const firstEntryDate = state.entries[0].date;
+  if (iso < firstEntryDate) {
+    return firstEntryDate;
+  }
+  return iso;
+}
+
+function getLockType(targetDate) {
+  if (targetDate > state.deviceToday) {
+    return "future";
+  }
+  if (targetDate > state.pageDate) {
+    return "unflipped";
+  }
+  return "open";
 }
 
 function spawnConfetti(count) {
@@ -480,10 +583,6 @@ function setImage(node, src, date) {
     node.removeAttribute("src");
     node.alt = `${formatJPDate(date)} のプレースホルダー`;
   }
-}
-
-function isFuture(targetDate) {
-  return targetDate > state.deviceToday;
 }
 
 function isoDate(d) {

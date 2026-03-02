@@ -241,6 +241,16 @@ body {
   transition: none;
 }
 
+.page-flipper.dropping .page-turn-front .page-image {
+  transform: translateY(125%) scale(0.98);
+  opacity: 0;
+  transition: transform 420ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 420ms ease;
+}
+
+.page-flipper.settling .page-turn-front .page-image {
+  transition: none !important;
+}
+
 .page-static-next {
   position: absolute;
   inset: 0;
