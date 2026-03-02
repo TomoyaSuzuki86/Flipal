@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Flipal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700&family=Noto+Sans+JP:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -20,22 +23,43 @@
       <section id="view-home" class="view active" aria-label="ホーム">
         <p id="todayLabel" class="date-label"></p>
         <div id="homeCard" class="card">
-          <div id="pageContainer" class="page-container">
-            <img id="homeImage" class="page-image" alt="今日の画像" />
-            <div id="curlOverlay" class="curl-overlay" aria-hidden="true"></div>
+          <div class="page-flipper">
+            <div id="page-turner" class="page-turner">
+              <div class="page-turn-front">
+                <img id="homeImage" class="page-image" alt="今日の画像" />
+                <div id="tearLine" class="tear-line" aria-hidden="true"></div>
+              </div>
+              <div class="page-turn-back"></div>
+            </div>
+          <div class="page-static-next">
+              <img id="nextImage" class="page-image" alt="次の日の画像" />
+            </div>
           </div>
-          <p id="homeMessage" class="message"></p>
         </div>
 
         <div class="controls">
-          <button id="flipButton" class="primary" type="button" disabled>次へめくる</button>
           <p id="flipStatus" class="status"></p>
+        </div>
+        <div id="testControls" class="test-controls" hidden>
+          <p id="testDateLabel" class="test-date-label"></p>
+          <div class="test-buttons">
+            <button id="testPrevDay" type="button">-1日</button>
+            <button id="testToday" type="button">実日付へ戻す</button>
+            <button id="testNextDay" type="button">+1日</button>
+          </div>
         </div>
       </section>
 
       <section id="view-archive" class="view" aria-label="アーカイブ">
-        <h2 class="archive-title">日付一覧</h2>
-        <div id="archiveGrid" class="archive-grid"></div>
+        <div class="archive-header">
+          <h2 class="archive-title">日付一覧</h2>
+          <div class="view-toggle">
+            <button id="gridViewBtn" class="toggle-btn active" type="button">グリッド</button>
+            <button id="calendarViewBtn" class="toggle-btn" type="button">カレンダー</button>
+          </div>
+        </div>
+        <div id="archiveGrid" class="archive-grid active"></div>
+        <div id="archiveCalendar" class="archive-calendar"></div>
       </section>
 
       <section id="view-detail" class="view" aria-label="詳細">
